@@ -1,0 +1,18 @@
+# IDE and Metal Extension files
+.metals/
+.bloop/
+.settings/
+
+# SBT and Java compilation paths
+target/
+project/project/
+project/target/
+.history/
+.pki/
+
+# IDE config files
+.idea/
+.vscode/
+
+# Local Retail Data Layer
+data/output/
