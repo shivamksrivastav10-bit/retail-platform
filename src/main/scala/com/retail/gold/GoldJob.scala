@@ -2,39 +2,44 @@ package com.retail.gold
 
 import com.retail.utils.SparkProvider
 import org.apache.spark.sql.functions._
+import org.slf4j.LoggerFactory
 
 object GoldJob {
+  private val logger = LoggerFactory.getLogger(getClass.getName)
+
   def main(args: Array[String]): Unit = {
-    val spark = SparkProvider.getSession("Gold Aggregations")
-    import spark.implicits._
+    val spark = SparkProvider.getSession("Gold Aggregation")
 
-    println("[GOLD] Starting Gold Layer aggregation pipeline...")
+    logger.info("Starting Gold Layer aggregation pipeline...")
 
-    // 1. Read our clean, joined data.
-    // (Simulating by reading raw files directly to seamlessly bypass local Windows environment quirks)
-    val ordersRaw = spark.read.option("header", "true").option("inferSchema", "true").csv("data/input/orders/orders.csv")
-    val customersRaw = spark.read.option("header", "true").option("inferSchema", "true").csv("data/input/customers/customers.csv")
-    
-    val enrichedTransactions = ordersRaw.join(customersRaw, Seq("customer_id"), "inner")
+    val enrichedTransactions = try {
+      spark.read.parquet("data/output/silver/enriched_transactions")
+    } catch {
+      case e: Exception =>
+        logger.error("Failed to read Silver data. Ensure Silver job completed successfully.", e)
+        throw e
+    }
 
-    // 2. Compute Business KPIs: Group by Segment and City, aggregate Total Spend and Order Volumes
-    val segmentMetrics = enrichedTransactions
-      .groupBy($"segment", $"city")
+    // Compute business KPIs
+    val goldKPIs = enrichedTransactions
+      .groupBy("segment", "city")
       .agg(
-        round(sum($"amount"), 2).as("total_revenue"),
-        count($"order_id").as("total_orders"),
-        round(avg($"amount"), 2).as("average_order_value")
+        round(sum("amount"), 2).as("total_revenue"),
+        count("order_id").as("total_orders"),
+        round(avg("amount"), 2).as("average_order_value")
       )
-      .orderBy($"total_revenue".desc)
 
-    // Preview our business intelligence metrics
-    println(s"[GOLD] Business KPI Summary Table:")
-    segmentMetrics.show()
+    logger.info("Business KPI Summary calculation complete.")
+    
+    // Public, compile-safe way to capture data into logs:
+    val previewLines = goldKPIs.take(10).map(row => row.toString()).mkString("\n")
+    logger.info(s"KPI Output Preview (Raw Rows):\n$previewLines")
 
-    // 3. Save the business table using our Windows bypass wrapper
-    SparkProvider.saveLocalData(segmentMetrics, "data/output/gold/segment_revenue_metrics")
+    goldKPIs.write
+      .mode("overwrite")
+      .parquet("data/output/gold/segment_revenue_metrics")
 
-    println("[GOLD] Done.")
+    logger.info("Gold Job pipeline process finalized cleanly.")
     spark.stop()
   }
 }

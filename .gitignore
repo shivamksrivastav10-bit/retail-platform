@@ -1,18 +1,18 @@
-# IDE and Metal Extension files
-.metals/
-.bloop/
-.settings/
-
-# SBT and Java compilation paths
+# Scala/SBT compilation binaries
 target/
 project/project/
 project/target/
-.history/
-.pki/
+.bsp/
+.metals/
 
-# IDE config files
+# Local data layers & runtime variables (Never commit data or engine logs!)
+data/output/
+logs/
+.tmp/
+C:/tmp/
+
+# OS/IDE specific system files
+.DS_Store
 .idea/
 .vscode/
-
-# Local Retail Data Layer
-data/output/
+Thumbs.db
