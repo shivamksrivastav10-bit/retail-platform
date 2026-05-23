@@ -12,15 +12,16 @@ object GoldJob {
 
     logger.info("Starting Gold Layer aggregation pipeline...")
 
+    // 1. Read from Silver Delta table in MinIO
     val enrichedTransactions = try {
-      spark.read.parquet("data/output/silver/enriched_transactions")
+      spark.read.format("delta").load("s3a://retail/silver/enriched_transactions")
     } catch {
       case e: Exception =>
         logger.error("Failed to read Silver data. Ensure Silver job completed successfully.", e)
         throw e
     }
 
-    // Compute business KPIs
+    // 2. Compute business KPIs
     val goldKPIs = enrichedTransactions
       .groupBy("segment", "city")
       .agg(
@@ -31,13 +32,12 @@ object GoldJob {
 
     logger.info("Business KPI Summary calculation complete.")
     
-    // Public, compile-safe way to capture data into logs:
-    val previewLines = goldKPIs.take(10).map(row => row.toString()).mkString("\n")
+    // Preview output
+    val previewLines = goldKPIs.take(10).map(_.toString()).mkString("\n")
     logger.info(s"KPI Output Preview (Raw Rows):\n$previewLines")
 
-    goldKPIs.write
-      .mode("overwrite")
-      .parquet("data/output/gold/segment_revenue_metrics")
+    // 3. Write to Gold Delta table in MinIO using the resilient wrapper
+    SparkProvider.saveLocalData(goldKPIs, "s3a://retail/gold/segment_revenue_metrics")
 
     logger.info("Gold Job pipeline process finalized cleanly.")
     spark.stop()

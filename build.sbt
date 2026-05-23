@@ -4,7 +4,9 @@ scalaVersion := "2.12.18"
 
 libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % "3.5.1",
-  "org.scalatest"    %% "scalatest" % "3.2.17" % Test
+  "org.scalatest"    %% "scalatest" % "3.2.17" % Test,
+  "io.delta" %% "delta-spark" % "3.1.0",
+  "org.apache.hadoop" % "hadoop-aws" % "3.3.4"
 )
 
 fork := true
